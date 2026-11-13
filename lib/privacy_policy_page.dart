@@ -1,282 +1,244 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:firebase_database/firebase_database.dart';
+// ========================================================================
+// GLOBAL AI TRAIN TRACKER - INDEPENDENT PRIVACY POLICY SCREEN WIDGET
+// OWNER: MD BELAL HOSSEN (mdbelalhossen2029@gmail.com)
+// URL: https://globalaitraintracker.blogspot.com/2026/11/privacy-policy-global-ai-train-tracker.html
+// ========================================================================
 
-// ১. মূল অ্যাপ এন্ট্রি পয়েন্ট (যেখানে সিকিউরিটি চেক ও প্রাইভেসি পলিসি প্রথমে রান করবে)
-class GlobalAiTrainTrackerApp extends StatelessWidget {
-  const GlobalAiTrainTrackerApp({super.key});
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+class PrivacyPolicyScreen extends StatefulWidget {
+  final bool isInitialGate;
+  final VoidCallback? onAgreedCallback;
+
+  const PrivacyPolicyScreen({
+    super.key,
+    this.isInitialGate = true,
+    this.onAgreedCallback,
+  });
 
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'GLOBAL AI TRAIN TRACKER',
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        primarySwatch: Colors.teal,
+  State<PrivacyPolicyScreen> createState() => _PrivacyPolicyScreenState();
+}
+
+class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
+  static const String _ownerName = "MD BELAL HOSSEN";
+  static const String _appName = "Global AI Train Tracker";
+  static const String _supportEmail = "mdbelalhossen2029@gmail.com";
+  static const String _bloggerPrivacyUrl =
+      "https://globalaitraintracker.blogspot.com/2026/11/privacy-policy-global-ai-train-tracker.html";
+
+  final _nameCtrl = TextEditingController();
+  final _emailCtrl = TextEditingController();
+  final _reasonCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _emailCtrl.dispose();
+    _reasonCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _openBloggerPrivacy() async {
+    try {
+      final uri = Uri.parse(_bloggerPrivacyUrl);
+      if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+        await launchUrl(uri, mode: LaunchMode.platformDefault);
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Could not open blogger link")),
+        );
+      }
+    }
+  }
+
+  Future<void> _submitAccountDeletion() async {
+    final name = _nameCtrl.text.trim();
+    final email = _emailCtrl.text.trim();
+    final reason = _reasonCtrl.text.trim();
+
+    if (name.isEmpty || email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enter Name and Email"), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    final mailUri = Uri.parse(
+        "mailto:$_supportEmail?subject=Delete My Account - $_appName&body=Name: $name%0AEmail: $email%0AReason: $reason");
+    try {
+      await launchUrl(mailUri, mode: LaunchMode.externalApplication);
+    } catch (_) {}
+  }
+
+  void _onYesPressed() {
+    HapticFeedback.mediumImpact();
+    if (widget.onAgreedCallback != null) {
+      widget.onAgreedCallback!();
+    } else if (Navigator.canPop(context)) {
+      Navigator.pop(context);
+    }
+  }
+
+  void _onNoPressed() {
+    HapticFeedback.heavyImpact();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF121212),
+        title: const Text("Required", style: TextStyle(color: Colors.redAccent)),
+        content: const Text("You must accept the Privacy Policy to use the app.", style: TextStyle(color: Colors.white70)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Review")),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => SystemNavigator.pop(),
+            child: const Text("Exit"),
+          ),
+        ],
       ),
-      home: const PrivacyPolicyCheckWrapper(),
     );
   }
-}
-
-// ২. প্রাইভেসি পলিসি ও সিকিউরিটি কনসেন্ট পেজ
-class PrivacyPolicyCheckWrapper extends StatefulWidget {
-  const PrivacyPolicyCheckWrapper({super.key});
-
-  @override
-  State<PrivacyPolicyCheckWrapper> createState() => _PrivacyPolicyCheckWrapperState();
-}
-
-class _PrivacyPolicyCheckWrapperState extends State<PrivacyPolicyCheckWrapper> {
-  bool _isLoading = true;
-  bool _isAccepted = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _checkPrivacyConsent();
-  }
-
-  // চেক করা ইউজার আগে প্রাইভেসি পলিসিতে সম্মতি দিয়েছে কিনা
-  Future<void> _checkPrivacyConsent() async {
-    final prefs = await SharedPreferences.getInstance();
-    final accepted = prefs.getBool('privacy_accepted') ?? false;
-    setState(() {
-      _isAccepted = accepted;
-      _isLoading = false;
-    });
-  }
-
-  Future<void> _saveConsent(bool accepted) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('privacy_accepted', accepted);
-    setState(() {
-      _isAccepted = accepted;
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator(color: Colors.tealAccent)),
-      );
-    }
-
-    // যদি ইউজার এক্সেপ্ট করে, তবে মূল ট্রেন স্ট্যাটাস পেজে প্রবেশ করবে
-    if (_isAccepted) {
-      return const TrainStatusPage(trainName: 'Sundarban Express (715)');
-    }
-
-    // নতুবা প্রাইভেসি পলিসি স্ক্রিন দেখাবে
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF0F2027),
-        title: const Text('Privacy & Security Verification', style: TextStyle(color: Colors.tealAccent, fontSize: 14, fontWeight: FontWeight.bold)),
-        centerTitle: true,
-      ),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF0F2027), Color(0xFF203A43), Color(0xFF2C5364)],
-          ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: Colors.blueGrey.shade900,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.tealAccent.withOpacity(0.4)),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.security, color: Colors.tealAccent, size: 30),
-                    SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Mandatory Privacy Check', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
-                          SizedBox(height: 2),
-                          Text('Please accept terms to unlock app features.', style: TextStyle(color: Colors.white70, fontSize: 12)),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+      backgroundColor: const Color(0xFF0A0A0A),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // HEADER
+            Container(
+              margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFF121212),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFFFD700), width: 1.5),
               ),
-              const SizedBox(height: 16),
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.black45,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.white24),
+              child: const Column(
+                children: [
+                  Text(
+                    _appName,
+                    style: TextStyle(color: Color(0xFFFFD700), fontSize: 18, fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center,
                   ),
-                  child: ListView(
-                    children: const [
-                      Text(
-                        'GLOBAL AI TRAIN TRACKER - TERMS & PRIVACY',
-                        style: TextStyle(color: Colors.tealAccent, fontSize: 15, fontWeight: FontWeight.bold),
+                  SizedBox(height: 4),
+                  Text(
+                    "Last Updated: 12 Nov 2026\nDeveloper: $_ownerName\nEmail: $_supportEmail",
+                    style: TextStyle(color: Colors.white70, fontSize: 11),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+
+            // BODY CONTENT
+            Expanded(
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF121212),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.white24),
+                ),
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text("Play Store Description", style: TextStyle(color: Color(0xFFFFD700), fontWeight: FontWeight.bold, fontSize: 14)),
+                      const SizedBox(height: 6),
+                      const Text(
+                        "Train news, AI help, PNR, Prayer Times and Battery — all in one app, completely free.\n"
+                        "This app is NOT an official app of any Railway authority in any country. Operated from Bangladesh.",
+                        style: TextStyle(color: Colors.white70, fontSize: 11.5, height: 1.4),
                       ),
-                      SizedBox(height: 10),
-                      Text(
-                        '1. Data Collection: We securely sync train status and device tokens via Firebase.\n\n'
-                        '2. Security & Auto-Lock: Unauthorized actions will trigger device security blocks.\n\n'
-                        '3. User Consent: By clicking "YES (AGREE)", you unlock all features. Selecting "NO" locks the internal features.',
-                        style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.5),
+                      const SizedBox(height: 14),
+
+                      _section("1. About This App", "Global AI Train Tracker helps search trains, check schedules, get AI help, and view prayer times. Not an official app of any railway authority."),
+                      _section("2. 8 Tabs Rule", "Tabs 1, 2, 3, 4, 6, 8 contain Google AdMob ads. Tabs 5 (Settings) and 7 (Support) have NO advertisements."),
+                      _section("3. Data We Collect", "Name, Email, Country, Location (if allowed), Device Info & Advertising ID. We do NOT collect bank details, passwords, or call lists."),
+                      
+                      const SizedBox(height: 6),
+                      const Text("Delete Account Form", style: TextStyle(color: Color(0xFFFFD700), fontWeight: FontWeight.bold, fontSize: 13)),
+                      const SizedBox(height: 6),
+                      TextField(controller: _nameCtrl, decoration: const InputDecoration(hintText: "Your Name", filled: true, fillColor: Colors.black45), style: const TextStyle(fontSize: 12)),
+                      const SizedBox(height: 6),
+                      TextField(controller: _emailCtrl, decoration: const InputDecoration(hintText: "Registered Email", filled: true, fillColor: Colors.black45), style: const TextStyle(fontSize: 12)),
+                      const SizedBox(height: 6),
+                      TextField(controller: _reasonCtrl, decoration: const InputDecoration(hintText: "Reason (Optional)", filled: true, fillColor: Colors.black45), style: const TextStyle(fontSize: 12)),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFFD700), foregroundColor: Colors.black),
+                          onPressed: _submitAccountDeletion,
+                          child: const Text("Request Account Deletion", style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+
+                      _section("4. Tickets & Payments", "We do not sell tickets. We only redirect you to the official Railway website of your selected country."),
+                      _section("5. Contact Us", "Email: $_supportEmail"),
+                      
+                      const SizedBox(height: 10),
+                      InkWell(
+                        onTap: _openBloggerPrivacy,
+                        child: const Text(
+                          "View Full Policy on Blogger Website",
+                          style: TextStyle(color: Color(0xFFFFD700), decoration: TextDecoration.underline, fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
                       ),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
-              Row(
+            ),
+
+            // BOTTOM BUTTONS
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
                 children: [
                   Expanded(
-                    child: SizedBox(
-                      height: 50,
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          showDialog(
-                            context: context,
-                            builder: (context) => AlertDialog(
-                              backgroundColor: Colors.blueGrey.shade900,
-                              title: const Text('Access Denied', style: TextStyle(color: Colors.redAccent)),
-                              content: const Text('You must agree to use the app features.'),
-                              actions: [
-                                TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK', style: TextStyle(color: Colors.tealAccent))),
-                              ],
-                            ),
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade800),
-                        icon: const Icon(Icons.close, color: Colors.white),
-                        label: const Text('NO (DENY)', style: TextStyle(color: Colors.white)),
-                      ),
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.redAccent)),
+                      onPressed: _onNoPressed,
+                      child: const Text("❌ I Do Not Agree", style: TextStyle(color: Colors.white, fontSize: 12)),
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 12),
                   Expanded(
-                    child: SizedBox(
-                      height: 50,
-                      child: ElevatedButton.icon(
-                        onPressed: () => _saveConsent(true),
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.teal.shade700),
-                        icon: const Icon(Icons.check, color: Colors.white),
-                        label: const Text('YES (AGREE)', style: TextStyle(color: Colors.white)),
-                      ),
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4CAF50)),
+                      onPressed: _onYesPressed,
+                      child: const Text("✅ I Agree", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
                     ),
                   ),
                 ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
-}
 
-// ৩. ট্রেন স্ট্যাটাস পেজ (ফিচার পেজ)
-class TrainStatusPage extends StatefulWidget {
-  final String trainName;
-  const TrainStatusPage({super.key, required this.trainName});
-
-  @override
-  State<TrainStatusPage> createState() => _TrainStatusPageState();
-}
-
-class _TrainStatusPageState extends State<TrainStatusPage> {
-  bool _isServiceActive = false; // উদাহরণস্বরূপ নো সার্ভিস স্ট্যাটাস
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF0F2027),
-        title: Text('Train Status: ${widget.trainName}', style: const TextStyle(color: Colors.tealAccent, fontSize: 14, fontWeight: FontWeight.bold)),
-        centerTitle: true,
-      ),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF0F2027), Color(0xFF203A43), Color(0xFF2C5364)],
-          ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.9),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.train, color: Colors.blueAccent, size: 32),
-                        const SizedBox(width: 12),
-                        Text(widget.trainName, style: const TextStyle(color: Colors.black87, fontSize: 18, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    const Text('SERVICE IS:', style: TextStyle(color: Colors.black54, fontSize: 16, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 6),
-                    Text(
-                      _isServiceActive ? 'RUNNING ON TIME' : 'NO SERVICE',
-                      style: TextStyle(color: _isServiceActive ? Colors.green : Colors.red, fontSize: 24, fontWeight: FontWeight.w900),
-                    ),
-                    const SizedBox(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(color: Colors.red.shade100, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.red, width: 2)),
-                          child: const Icon(Icons.do_not_disturb_alt, color: Colors.red, size: 40),
-                        ),
-                        const SizedBox(width: 20),
-                        Container(
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(color: Colors.blueGrey.shade100, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.blueGrey, width: 2)),
-                          child: const Icon(Icons.lock, color: Colors.blueGrey, size: 40),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const Spacer(),
-              ElevatedButton.icon(
-                onPressed: () async {
-                  // লগআউট বা প্রাইভেসি পারমিশন রিসেট করার অপশন
-                  final prefs = await SharedPreferences.getInstance();
-                  await prefs.setBool('privacy_accepted', false);
-                  setState(() {});
-                },
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.blueGrey.shade800),
-                icon: const Icon(Icons.refresh, color: Colors.white),
-                label: const Text('Reset Privacy Consent (Testing)', style: TextStyle(color: Colors.white)),
-              ),
-              const SizedBox(height: 10),
-            ],
-          ),
-        ),
+  Widget _section(String title, String body) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: const TextStyle(color: Color(0xFFFFD700), fontWeight: FontWeight.bold, fontSize: 13)),
+          const SizedBox(height: 3),
+          Text(body, style: const TextStyle(color: Colors.white70, fontSize: 11.5, height: 1.35)),
+        ],
       ),
     );
   }
